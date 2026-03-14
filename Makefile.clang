@@ -1,0 +1,17 @@
+CXX = /usr/bin/clang++
+CPPFLAGS = -D_GNU_SOURCE -D_XOPEN_SOURCE=700
+CXXFLAGS = -O3 -std=c++17 -Wall -Wextra -Wpedantic
+
+PROGRAMS: genrandomdata qap
+
+all: $(PROGRAMS)
+
+qap: qap.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@
+
+genrandomdata: genrandomdata.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@
+
+clean:
+	rm -f qap genrandomdata
+
