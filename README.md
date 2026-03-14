@@ -103,5 +103,4 @@ The files suffixed with `*.dat` - included here - are sample input files suitabl
 
 Files with names beginning with `fldata` are Flow Graph input files. Files with names beginning with `dstdata` are Distance Graph input files.
 
-`Makefile` is for Linux. `Makefile.clang` is for MacOS.
 
