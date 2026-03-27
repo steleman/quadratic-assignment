@@ -137,6 +137,5 @@ GPU time: 0.000000000586 second(s).
 
 The `chr20a.dat` sample data does not finish after running continuously for 48 hours with the CPU-only version (`qap.cpp`). So, some improvement is noticeable.
 
-This is Work-In-Progress. I'm looking at parallelizing `std::next_permutation` somehow, to take advantage of the threads in a CUDA Kernel.
-
+The CUDA Acceleration part is Work-In-Progress. I'm looking at parallelizing `qap::next_permutation` somehow, to take advantage of the threads in a CUDA Kernel. Yes, I had to write my own versions of `std::next_permutation`, `std::swap` and `std::reverse` because the C++ Standard Library is not usable in CUDA Kernels or CUDA device code.
 
