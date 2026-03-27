@@ -1,0 +1,45 @@
+# Change this to match your installed CUDA version.
+CUDA_VERSION = 12.9
+
+# Change this to match your CUDA installation.
+CUDA_ROOT = /usr/local/cuda-$(CUDA_VERSION)
+CUDA_BINDIR = $(CUDA_ROOT)/bin
+CUDA_LIBDIR = $(CUDA_ROOT)/lib64
+
+# Change this to match your GPU's Compute Capabilities.
+CUDA_CC = 89
+
+OFLAG = -O3
+CFLAG = -g
+HERE=$(shell pwd)
+
+NVCC = $(CUDA_BINDIR)/nvcc
+NVCC_CXXFLAGS = --verbose -x cu -std=c++17 $(GFLAG) $(OFLAG) -c -Xcudafe --diag_suppress=186
+NVCC_CXXFLAGS += --forward-unknown-to-host-compiler --expt-relaxed-constexpr
+NVCC_CXXFLAGS += -gencode arch=compute_$(CUDA_CC),code=sm_$(CUDA_CC)
+NVCC_CXXFLAGS += --generate-code=arch=compute_$(CUDA_CC),code=\[compute_$(CUDA_CC),sm_$(CUDA_CC)\]
+NVCC_CXXFLAGS += -objtemp
+NVCC_CPPFLAGS = -D_GNU_SOURCE -D_XOPEN_SOURCE=700
+
+CUDA_LIBRARIES = /usr/lib64/libcuda.so $(CUDA_LIBDIR)/libcudart.so
+CUDA_LIBRARIES += $(CUDA_LIBDIR)/libcudadevrt.a
+
+CXX = /usr/bin/g++
+CXXFLAGS = $(GFLAG) $(OFLAG) -std=c++17
+CPPFLAGS = $(NVCC_CPPFLAGS)
+
+LDFLAGS = $(OFLAG) $(CUDA_LIBRARIES) -Wl,-rpath -Wl,$(CUDA_LIBDIR)
+
+PROGRAMS = cudaqap
+
+all: $(PROGRAMS)
+
+cudaqap.o: cudaqap.cu
+	$(NVCC) $(NVCC_CPPFLAGS) $(NVCC_CXXFLAGS) $< -o $@
+
+cudaqap: cudaqap.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< -o $@
+
+clean:
+	rm -f cudaqap.o cudaqap
+

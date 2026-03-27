@@ -103,5 +103,40 @@ The files suffixed with `*.dat` - included here - are sample input files suitabl
 
 Files with names beginning with `fldata` are Flow Graph input files. Files with names beginning with `dstdata` are Distance Graph input files.
 
-`Makefile` is for Linux. `Makefile.clang` is for MacOS.
+CUDA Acceleration
+=================
+
+`cudaqap.cu` is the CUDA-Accelerated version of `qap.cpp`. `Makefile.cuda` is the Makefile for building with CUDA.
+
+I tested it with CUDA 12.9. It should work with any CUDA version higher than that.
+
+Sample results:
+
+```
+%>> ./cudaqap -d ./dstdata-144.dat -f ./fldata-144.dat
+Minimum cost: 1542812
+Iterations:   65731
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000289 second(s).
+%>> ./cudaqap -d ./dstdata-400.dat -f ./fldata-400.dat
+Minimum cost: 1177097
+Iterations:   6059950
+CPU Clock Resolution: 0.000000001.
+GPU time: 17.000000000628 second(s).
+%>> ./cudaqap -s ./chr20a.dat
+Minimum cost: 144
+Iterations:   12680459
+CPU Clock Resolution: 0.000000001.
+GPU time: 32.000000000198 second(s).
+%>> ./cudaqap -d ./dstdata-256.dat -f ./fldata-256.dat
+Minimum cost: 4021125
+Iterations:   223341
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000586 second(s).
+```
+
+The `chr20a.dat` sample data does not finish after running continuously for 48 hours with the CPU-only version (`qap.cpp`). So, some improvement is noticeable.
+
+This is Work-In-Progress. I'm looking at parallelizing `std::next_permutation` somehow, to take advantage of the threads in a CUDA Kernel.
+
 
