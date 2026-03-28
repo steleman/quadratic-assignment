@@ -38,6 +38,8 @@ __device__  uint32_t H;
 __device__  uint32_t W;
 __device__ uint64_t HIT;
 __device__ uint32_t HMC;
+__shared__ extern uint32_t MCD[];
+__shared__ extern uint32_t LCD[];
 
 uint32_t* HGFLG;
 uint32_t* HGDST;
@@ -72,9 +74,13 @@ namespace qap {
 template<typename _Ty>
 __device__
 void swap(_Ty* A, _Ty* B) {
+#if defined(__CUDAQAP_USE_CUDA_ATOMIC_SWAP)
+  __nv_atomic_exchange(A, B, B, __ATOMIC_SEQ_CST);
+#else
   _Ty T = *A;
   *A = *B;
   *B = T;
+#endif
 }
 
 template<typename _Ty>
@@ -103,7 +109,7 @@ _Ty array_index(const _Ty* AX, uint32_t IXW, uint32_t IXH, uint32_t W) {
 
 template<typename _Ty>
 __device__
-bool next_permutation(_Ty* AX, uint32_t N, uint32_t TID) {
+bool next_permutation(_Ty* AX, uint32_t N) {
   int32_t K = static_cast<int32_t>(N - 2U);
   int32_t J = static_cast<int32_t>(N - 1U);
 
@@ -498,8 +504,8 @@ void PrintDeviceVector(const uint32_t* AS, uint32_t S, uint32_t TID) {
 template<uint32_t _ShmemSize = 2048, uint32_t _MCSize = 32U>
 __global__ void QuadraticAssignment(size_t LSS, uint32_t MCSize) {
   __shared__ uint64_t __align__(8) XMC;
-  __shared__ uint32_t __align__(8) MCD[_ShmemSize * 2 + _MCSize];
-  __shared__ uint32_t __align__(8) LCD[_ShmemSize * 2 + _MCSize];
+  __shared__ uint32_t __align__(8) MCD[_ShmemSize * 2 + _MCSize * sizeof(uint32_t)];
+  __shared__ uint32_t __align__(8) LCD[_ShmemSize * 2 + _MCSize * sizeof(uint32_t)];
 
   XMC = std::numeric_limits<uint32_t>::max();
   uint32_t TID = blockIdx.x * blockDim.x + threadIdx.x;
@@ -507,12 +513,17 @@ __global__ void QuadraticAssignment(size_t LSS, uint32_t MCSize) {
   (void) LCD;
   (void) TID;
 
+  if (threadIdx.x < LSS)
+    MCD[threadIdx.x] = GAS[threadIdx.x];
+
+  __syncthreads();
+
   do {
     uint32_t CC = ComputeCost(W);
     XMC = qap::min<uint32_t>(CC, XMC);
     ++IT;
 
-  } while (qap::next_permutation(GAS, LSS, TID));
+  } while (qap::next_permutation(MCD, LSS));
 
   __syncthreads();
   MC = static_cast<uint32_t>(XMC);

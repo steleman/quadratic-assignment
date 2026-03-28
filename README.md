@@ -113,29 +113,175 @@ I tested it with CUDA 12.9. It should work with any CUDA version higher than tha
 Sample results:
 
 ```
-%>> ./cudaqap -d ./dstdata-144.dat -f ./fldata-144.dat
-Minimum cost: 1542812
-Iterations:   65731
+%> ./cudaqap -d ./dstdata-100.dat -f ./fldata-100.dat
+Minimum cost: 319571
+Iterations:   12408
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000289 second(s).
-%>> ./cudaqap -d ./dstdata-400.dat -f ./fldata-400.dat
-Minimum cost: 1177097
-Iterations:   6059950
+GPU time: 0.000000000020 second(s).
+
+%> ./cudaqap -d ./dstdata-100.dat -f ./fldata-100.dat
+Minimum cost: 319571
+Iterations:   16968
 CPU Clock Resolution: 0.000000001.
-GPU time: 17.000000000628 second(s).
-%>> ./cudaqap -s ./chr20a.dat
-Minimum cost: 144
-Iterations:   12680459
+GPU time: 0.000000000023 second(s).
+
+%> ./cudaqap -d ./dstdata-100.dat -f ./fldata-100.dat
+Minimum cost: 319571
+Iterations:   14860
 CPU Clock Resolution: 0.000000001.
-GPU time: 32.000000000198 second(s).
-%>> ./cudaqap -d ./dstdata-256.dat -f ./fldata-256.dat
-Minimum cost: 4021125
-Iterations:   223341
+GPU time: 0.000000000026 second(s).
+
+%> ./cudaqap -d ./dstdata-144.dat -f ./fldata-144.dat
+Minimum cost: 1627159
+Iterations:   44874
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000586 second(s).
+GPU time: 0.000000000096 second(s).
+
+%> ./cudaqap -d ./dstdata-144.dat -f ./fldata-144.dat
+Minimum cost: 1627159
+Iterations:   29432
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000056 second(s).
+
+%> ./cudaqap -d ./dstdata-144.dat -f ./fldata-144.dat
+Minimum cost: 1627159
+Iterations:   52215
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000099 second(s).
+
+%> ./cudaqap -d ./dstdata-256.dat -f ./fldata-256.dat
+Minimum cost: 5517628
+Iterations:   91724
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000116 second(s).
+
+%> ./cudaqap -d ./dstdata-256.dat -f ./fldata-256.dat
+Minimum cost: 5517628
+Iterations:   120355
+CPU Clock Resolution: 0.000000001.
+GPU time: 1.000000000743 second(s).
+
+%> ./cudaqap -d ./dstdata-256.dat -f ./fldata-256.dat
+Minimum cost: 5517628
+Iterations:   93707
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000116 second(s).
+
+%> ./cudaqap -d ./dstdata-400.dat -f ./fldata-400.dat
+Minimum cost: 20216534
+Iterations:   127574
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000152 second(s).
+
+%> ./cudaqap -d ./dstdata-400.dat -f ./fldata-400.dat
+Minimum cost: 20216534
+Iterations:   132486
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000177 second(s).
+
+%> ./cudaqap -d ./dstdata-400.dat -f ./fldata-400.dat
+Minimum cost: 20216534
+Iterations:   437175
+CPU Clock Resolution: 0.000000001.
+GPU time: 2.000000000532 second(s).
+
+%> ./cudaqap -d ./dstdata-625.dat -f ./fldata-625.dat
+Minimum cost: 79571576
+Iterations:   114717
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000203 second(s).
+
+%> ./cudaqap -d ./dstdata-625.dat -f ./fldata-625.dat
+Minimum cost: 79571576
+Iterations:   99428
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000177 second(s).
+
+%> ./cudaqap -d ./dstdata-625.dat -f ./fldata-625.dat
+Minimum cost: 79571576
+Iterations:   122571
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000299 second(s).
+
+%> ./cudaqap -d ./dstdata-900.dat -f ./fldata-900.dat
+Minimum cost: 234319635
+Iterations:   221805
+CPU Clock Resolution: 0.000000001.
+GPU time: 1.000000000407 second(s).
+
+%> ./cudaqap -d ./dstdata-900.dat -f ./fldata-900.dat
+Minimum cost: 234319635
+Iterations:   205894
+CPU Clock Resolution: 0.000000001.
+GPU time: 1.000000000453 second(s).
+
+%> ./cudaqap -d ./dstdata-900.dat -f ./fldata-900.dat
+Minimum cost: 234319635
+Iterations:   213449
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000569 second(s).
+
+%> ./cudaqap -s ./chr12a.dat
+Minimum cost: 40172
+Iterations:   31370
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000056 second(s).
+
+%> ./cudaqap -s ./chr12a.dat
+Minimum cost: 40172
+Iterations:   30773
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000041 second(s).
+
+%> ./cudaqap -s ./chr12a.dat
+Minimum cost: 40172
+Iterations:   37282
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000059 second(s).
+
+%> ./cudaqap -s ./chr20a.dat
+Minimum cost: 10478
+Iterations:   138098
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000164 second(s).
+
+%> ./cudaqap -s ./chr20a.dat
+Minimum cost: 10478
+Iterations:   175180
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000209 second(s).
+
+%> ./cudaqap -s ./chr20a.dat
+Minimum cost: 10478
+Iterations:   116742
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000175 second(s).
+
+%> ./cudaqap -s ./chr25a.dat
+Minimum cost: 19750
+Iterations:   103434
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000185 second(s).
+
+%> ./cudaqap -s ./chr25a.dat
+Minimum cost: 19750
+Iterations:   136313
+CPU Clock Resolution: 0.000000001.
+GPU time: 1.000000000755 second(s).
+
+%> ./cudaqap -s ./chr25a.dat
+Minimum cost: 19750
+Iterations:   100537
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.000000000180 second(s).
+
 ```
 
-The `chr20a.dat` sample data does not finish after running continuously for 48 hours with the CPU-only version (`qap.cpp`). So, some improvement is noticeable.
+Each test was run on the same sample data 3 times sequentially to prove the consistency of the results.
 
-The CUDA Acceleration part is Work-In-Progress. I'm looking at parallelizing `qap::next_permutation` somehow, to take advantage of the threads in a CUDA Kernel. Yes, I had to write my own versions of `std::next_permutation`, `std::swap` and `std::reverse` because the C++ Standard Library is not usable in CUDA Kernels or CUDA device code.
+The test results were obtained on a Corei9 laptop with a NVIDIA 4080 GPU.
+
+The `chr20a.dat` sample data does not finish after running continuously for 48 hours with the CPU-only version (`qap.cpp`). The improvement with CUDA is noticeable.
+
+The CUDA Acceleration part is Work-In-Progress. It probably needs some cleanup.
 
