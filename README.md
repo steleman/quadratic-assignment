@@ -3,6 +3,7 @@ My own research on the Quadratic Assignment Problem
 
 This is some of my own research on the Quadratic Assignment Problem (QAP).
 The main program is `qap`. `genrandomdata` is a random data generator to be used with `qap`.
+The CUDA-accelerated program is `cudaqap`. See more below.
 
 This is Work-In-Progress. I haven't touched these in over a year. I've been working on other things since then. I'm just using Github as a file backup. :-)
 
