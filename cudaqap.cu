@@ -110,16 +110,17 @@ _Ty array_index(const _Ty* AX, uint32_t IXW, uint32_t IXH, uint32_t W) {
 template<typename _Ty>
 __device__
 bool next_permutation(_Ty* AX, uint32_t N) {
-  int32_t K = static_cast<int32_t>(N - 2U);
-  int32_t J = static_cast<int32_t>(N - 1U);
+  if (N < 2U)
+    return false;
+
+  int64_t K = static_cast<int64_t>(N - 2U);
+  int64_t J = static_cast<int64_t>(N - 1U);
 
   while (K >= 0 && AX[K] >= AX[K + 1])
     --K;
 
-  if (K < 0) {
-    reverse(AX, 0, N - 1);
+  if (K < 0)
     return false;
-  }
 
   while (J >= 0 && AX[J] <= AX[K])
     --J;
@@ -191,12 +192,6 @@ void ReadFromFile(const std::string& FileName,
           ++LX;
         }
 
-        MX = std::max<uint32_t>(MX, LX);
-
-        if (LX < MX)
-          std::fill_n(V.end(), MX - LX,
-                      std::numeric_limits<uint32_t>::max());
-
         IV.push_back(V);
       }
     }
@@ -263,11 +258,6 @@ void ReadFromFile(const std::string& FileName) {
           ++LX;
         }
 
-        MX = std::max<uint32_t>(MX, LX);
-        if (LX < MX)
-          std::fill_n(V.end(), MX - LX,
-                      std::numeric_limits<uint32_t>::max());
-
         HFLG.push_back(V);
       }
     }
@@ -290,11 +280,6 @@ void ReadFromFile(const std::string& FileName) {
           V.push_back(static_cast<uint32_t>(std::stoul(Tok)));
           ++LX;
         }
-
-        MX = std::max<uint32_t>(MX, LX);
-        if (LX < MX)
-          std::fill_n(V.end(), MX - LX,
-                      std::numeric_limits<uint32_t>::max());
 
         HDST.push_back(V);
       }
