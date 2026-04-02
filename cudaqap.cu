@@ -33,13 +33,14 @@ __managed__ uint32_t* GDST;
 __managed__ uint32_t* GAS;
 __device__  uint32_t DSS;
 __device__  uint64_t IT;
-__device__  uint32_t MC;
+__device__  uint64_t MC;
 __device__  uint32_t H;
 __device__  uint32_t W;
 __device__ uint64_t HIT;
-__device__ uint32_t HMC;
-__shared__ extern uint32_t MCD[];
-__shared__ extern uint32_t LCD[];
+__device__ uint64_t HMC;
+__shared__ uint32_t MCDI;
+extern __shared__ uint32_t MCD[];
+__shared__ uint64_t __align__(8) XMC;
 
 uint32_t* HGFLG;
 uint32_t* HGDST;
@@ -47,7 +48,7 @@ uint32_t* HGAS;
 uint32_t HSS;
 uint32_t HH;
 uint32_t HW;
-uint32_t GMC;
+uint64_t GMC;
 uint64_t GIT;
 
 std::vector<std::vector<uint32_t>> HFLG;
@@ -486,32 +487,35 @@ void PrintDeviceVector(const uint32_t* AS, uint32_t S, uint32_t TID) {
     (void) printf(" } ");
 }
 
-template<uint32_t _ShmemSize = 2048, uint32_t _MCSize = 32U>
-__global__ void QuadraticAssignment(size_t LSS, uint32_t MCSize) {
-  __shared__ uint64_t __align__(8) XMC;
-  __shared__ uint32_t __align__(8) MCD[_ShmemSize * 2 + _MCSize * sizeof(uint32_t)];
-  __shared__ uint32_t __align__(8) LCD[_ShmemSize * 2 + _MCSize * sizeof(uint32_t)];
+__global__ void QuadraticUniverse(size_t LSS, uint32_t* XAS) {
+  if (threadIdx.x == 0 && LSS > 2) {
+    XMC = std::numeric_limits<uint64_t>::max();
 
-  XMC = std::numeric_limits<uint32_t>::max();
-  uint32_t TID = blockIdx.x * blockDim.x + threadIdx.x;
-  (void) MCD;
-  (void) LCD;
-  (void) TID;
-
-  if (threadIdx.x < LSS)
-    MCD[threadIdx.x] = GAS[threadIdx.x];
+    for (uint32_t I = 0; I < LSS; ++I) {
+      MCD[I] = XAS[I];
+    }
+  }
 
   __syncthreads();
+}
+
+template<uint32_t _ShmemSize = 4096, uint32_t _MCSize>
+__global__ void QuadraticAssignment(size_t LSS, uint32_t MCSize, uint32_t* XAS) {
+  if (LSS < 2)
+    return;
+
+  uint32_t TID = blockIdx.x * blockDim.x + threadIdx.x;
 
   do {
     uint32_t CC = ComputeCost(W);
-    XMC = qap::min<uint32_t>(CC, XMC);
+    XMC = qap::min<uint64_t>(CC, XMC);
     ++IT;
-
   } while (qap::next_permutation(MCD, LSS));
 
   __syncthreads();
-  MC = static_cast<uint32_t>(XMC);
+
+  MC = XMC;
+  __syncthreads();
 }
 
 uint64_t Iterations() {
@@ -524,11 +528,11 @@ uint64_t Iterations() {
   return LIT;
 }
 
-uint32_t MinimumCost() {
+uint64_t MinimumCost() {
   uint64_t MCP[2];
-  uint32_t LMC;
+  uint64_t LMC;
   checkCudaError(cudaGetSymbolAddress((void**) &MCP, MC));
-  checkCudaError(cudaMemcpyFromSymbol(&LMC, MC, sizeof(uint32_t), 0,
+  checkCudaError(cudaMemcpyFromSymbol(&LMC, MC, sizeof(uint64_t), 0,
                                       cudaMemcpyDeviceToHost));
   GMC = LMC;
   return LMC;
@@ -693,7 +697,8 @@ int main(int argc, char* const argv[]) {
   dim3 NumBlocks(16U, 16U);
 
   Timestamp(&tp_start);
-  QuadraticAssignment<2048, 256><<<ThreadsPerBlock, NumBlocks, ShmemSize + HAS.size()>>>(HAS.size(), NBlocks);
+  QuadraticUniverse<<<1, 1>>>(HAS.size(), GAS);
+  QuadraticAssignment<4096, 1024><<<ThreadsPerBlock, NumBlocks, ShmemSize + HAS.size()>>>(HAS.size(), NBlocks, DAS);
   checkCudaError(cudaDeviceSynchronize());
   Timestamp(&tp_end);
 
