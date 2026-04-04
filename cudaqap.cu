@@ -98,10 +98,12 @@ void reverse(_Ty* AX, int32_t B, int32_t E) {
     ++B;
     --E;
   }
+
+  __syncthreads();
 }
 
 template<typename _Ty>
-__device__
+__device__ __forceinline__
 _Ty array_index(const _Ty* AX, uint32_t IXW, uint32_t IXH, uint32_t W) {
   const _Ty* AXI = static_cast<const _Ty*>(AX + IXW * W);
   const _Ty* AXP = AXI + IXH;
@@ -509,7 +511,7 @@ __global__ void QuadraticAssignment(size_t LSS, uint32_t MCSize, uint32_t* XAS) 
   do {
     uint32_t CC = ComputeCost(W);
     XMC = qap::min<uint64_t>(CC, XMC);
-    ++IT;
+    (void) atomicAdd((unsigned long long*) &IT, 1UL);
   } while (qap::next_permutation(MCD, LSS));
 
   __syncthreads();
