@@ -116,165 +116,165 @@ Sample results:
 ```
 %> ./cudaqap -d ./dstdata-100.dat -f ./fldata-100.dat
 Minimum cost: 319571
-Iterations:   12408
+Iterations:   67840
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000020 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-100.dat -f ./fldata-100.dat
 Minimum cost: 319571
-Iterations:   16968
+Iterations:   67840
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000023 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-100.dat -f ./fldata-100.dat
 Minimum cost: 319571
-Iterations:   14860
+Iterations:   67840
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000026 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-144.dat -f ./fldata-144.dat
 Minimum cost: 1627159
-Iterations:   44874
+Iterations:   68352
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000096 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-144.dat -f ./fldata-144.dat
 Minimum cost: 1627159
-Iterations:   29432
+Iterations:   68352
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000056 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-144.dat -f ./fldata-144.dat
 Minimum cost: 1627159
-Iterations:   52215
+Iterations:   68352
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000099 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-256.dat -f ./fldata-256.dat
 Minimum cost: 5517628
-Iterations:   91724
+Iterations:   69376
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000116 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-256.dat -f ./fldata-256.dat
 Minimum cost: 5517628
-Iterations:   120355
+Iterations:   69376
 CPU Clock Resolution: 0.000000001.
-GPU time: 1.000000000743 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-256.dat -f ./fldata-256.dat
 Minimum cost: 5517628
-Iterations:   93707
+Iterations:   69376
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000116 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-400.dat -f ./fldata-400.dat
 Minimum cost: 20216534
-Iterations:   127574
+Iterations:   70400
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000152 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-400.dat -f ./fldata-400.dat
 Minimum cost: 20216534
-Iterations:   132486
+Iterations:   70400
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000177 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-400.dat -f ./fldata-400.dat
 Minimum cost: 20216534
-Iterations:   437175
+Iterations:   70400
 CPU Clock Resolution: 0.000000001.
-GPU time: 2.000000000532 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-625.dat -f ./fldata-625.dat
 Minimum cost: 79571576
-Iterations:   114717
+Iterations:   71680
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000203 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-625.dat -f ./fldata-625.dat
 Minimum cost: 79571576
-Iterations:   99428
+Iterations:   71680
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000177 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-625.dat -f ./fldata-625.dat
 Minimum cost: 79571576
-Iterations:   122571
+Iterations:   71680
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000299 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -d ./dstdata-900.dat -f ./fldata-900.dat
 Minimum cost: 234319635
-Iterations:   221805
+Iterations:   72960
 CPU Clock Resolution: 0.000000001.
-GPU time: 1.000000000407 second(s).
+GPU time: 0.000000000001 second(s).
 
 %> ./cudaqap -d ./dstdata-900.dat -f ./fldata-900.dat
 Minimum cost: 234319635
-Iterations:   205894
+Iterations:   72960
 CPU Clock Resolution: 0.000000001.
-GPU time: 1.000000000453 second(s).
+GPU time: 0.000000000001 second(s).
 
 %> ./cudaqap -d ./dstdata-900.dat -f ./fldata-900.dat
 Minimum cost: 234319635
-Iterations:   213449
+Iterations:   72960
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000569 second(s).
+GPU time: 0.000000000001 second(s).
 
 %> ./cudaqap -s ./chr12a.dat
 Minimum cost: 40172
-Iterations:   31370
+Iterations:   68352
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000056 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -s ./chr12a.dat
 Minimum cost: 40172
-Iterations:   30773
+Iterations:   68352
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000041 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -s ./chr12a.dat
 Minimum cost: 40172
-Iterations:   37282
+Iterations:   68352
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000059 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -s ./chr20a.dat
 Minimum cost: 10478
-Iterations:   138098
+Iterations:   70400
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000164 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -s ./chr20a.dat
 Minimum cost: 10478
-Iterations:   175180
+Iterations:   70400
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000209 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -s ./chr20a.dat
 Minimum cost: 10478
-Iterations:   116742
+Iterations:   70400
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000175 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -s ./chr25a.dat
 Minimum cost: 19750
-Iterations:   103434
+Iterations:   71680
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000185 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -s ./chr25a.dat
 Minimum cost: 19750
-Iterations:   136313
+Iterations:   71680
 CPU Clock Resolution: 0.000000001.
-GPU time: 1.000000000755 second(s).
+GPU time: 0.000000000000 second(s).
 
 %> ./cudaqap -s ./chr25a.dat
 Minimum cost: 19750
-Iterations:   100537
+Iterations:   71680
 CPU Clock Resolution: 0.000000001.
-GPU time: 0.000000000180 second(s).
+GPU time: 0.000000000000 second(s).
 
 ```
 
