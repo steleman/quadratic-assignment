@@ -20,7 +20,6 @@ NVCC_CXXFLAGS += -gencode arch=compute_$(CUDA_CC),code=sm_$(CUDA_CC)
 NVCC_CXXFLAGS += --generate-code=arch=compute_$(CUDA_CC),code=\[compute_$(CUDA_CC),sm_$(CUDA_CC)\]
 NVCC_CXXFLAGS += -objtemp
 NVCC_CPPFLAGS = -D_GNU_SOURCE -D_XOPEN_SOURCE=700
-NVCC_CPPFLAGS += -D__CUDAQAP_USE_CUDA_ATOMIC_SWAP
 
 CUDA_LIBRARIES = /usr/lib64/libcuda.so $(CUDA_LIBDIR)/libcudart.so
 CUDA_LIBRARIES += $(CUDA_LIBDIR)/libcudadevrt.a

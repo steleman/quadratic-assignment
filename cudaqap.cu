@@ -31,13 +31,14 @@
 __managed__ uint32_t* GFLG;
 __managed__ uint32_t* GDST;
 __managed__ uint32_t* GAS;
-__device__  uint32_t DSS;
-__device__  uint64_t IT;
-__device__  uint64_t MC;
-__device__  uint32_t H;
-__device__  uint32_t W;
-__device__ uint64_t HIT;
-__device__ uint64_t HMC;
+__device__  uint32_t DSS = 0U;
+__device__  uint64_t IT = 0UL;
+__device__  uint64_t MC = 0UL;
+__device__  uint32_t H = 0U;
+__device__  uint32_t W = 0U;
+__device__ uint64_t HIT = 0UL;
+__device__ uint64_t HMC = 0UL;
+__device__ uint64_t TOT = 0UL;
 __shared__ uint32_t MCDI;
 extern __shared__ uint32_t MCD[];
 __shared__ uint64_t __align__(8) XMC;
@@ -73,15 +74,9 @@ void checkCudaReturnValue(_Ty R, const char* FN, const char* FL, int32_t LN) {
 namespace qap {
 
 template<typename _Ty>
-__device__
+__device__ __forceinline__
 void swap(_Ty* A, _Ty* B) {
-#if defined(__CUDAQAP_USE_CUDA_ATOMIC_SWAP)
-  __nv_atomic_exchange(A, B, B, __ATOMIC_SEQ_CST);
-#else
-  _Ty T = *A;
-  *A = *B;
-  *B = T;
-#endif
+  (void) __nv_atomic_exchange(A, B, B, __ATOMIC_SEQ_CST);
 }
 
 template<typename _Ty>
@@ -506,11 +501,12 @@ __global__ void QuadraticAssignment(size_t LSS, uint32_t MCSize, uint32_t* XAS) 
   if (LSS < 2)
     return;
 
+  (void) atomicAdd((unsigned long long*) &TOT, 1UL);
   uint32_t TID = blockIdx.x * blockDim.x + threadIdx.x;
 
   do {
     uint32_t CC = ComputeCost(W);
-    XMC = qap::min<uint64_t>(CC, XMC);
+    (void) atomicMin((unsigned long long*) &XMC, CC);
     (void) atomicAdd((unsigned long long*) &IT, 1UL);
   } while (qap::next_permutation(MCD, LSS));
 
@@ -538,6 +534,15 @@ uint64_t MinimumCost() {
                                       cudaMemcpyDeviceToHost));
   GMC = LMC;
   return LMC;
+}
+
+uint32_t NumThreads() {
+  uint64_t TOTP[2];
+  uint64_t LTOT;
+  checkCudaError(cudaGetSymbolAddress((void**) &TOTP, TOT));
+  checkCudaError(cudaMemcpyFromSymbol(&LTOT, TOT, sizeof(uint64_t), 0,
+                                      cudaMemcpyDeviceToHost));
+  return LTOT;
 }
 
 void SetupInitialCounters() {
@@ -706,6 +711,7 @@ int main(int argc, char* const argv[]) {
 
   std::cout << "Minimum cost: " << MinimumCost() << std::endl;
   std::cout << "Iterations:   " << Iterations() << std::endl;
+  std::cout << "NumThreads:   " << NumThreads() << std::endl;
 
   checkCudaError(cudaDeviceReset());
 
