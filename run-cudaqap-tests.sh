@@ -1,7 +1,8 @@
 #!/bin/bash
 
 here="`pwd`"
-outfile="cudaqap-output.out"
+ts="`date +%Y%m%d`"
+outfile="cudaqap-output-${ts}.out"
 
 cat /dev/null > ${outfile}
 
@@ -13,20 +14,13 @@ for idx in \
   '625' \
   '900'
 do
-  echo "./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat"
-  echo "%> ./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat" >> ${outfile} 2>&1
-  ./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat >> ${outfile} 2>&1
-  echo "" >> ${outfile} 2>&1
-
-  echo "./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat"
-  echo "%> ./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat" >> ${outfile} 2>&1
-  ./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat >> ${outfile} 2>&1
-  echo "" >> ${outfile} 2>&1
-
-  echo "./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat"
-  echo "%> ./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat" >> ${outfile} 2>&1
-  ./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat >> ${outfile} 2>&1
-  echo "" >> ${outfile} 2>&1
+  for ((ctr=0; ctr<10; ctr++))
+  do
+    echo "./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat"
+    echo "%> ./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat" >> ${outfile} 2>&1
+    ./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat >> ${outfile} 2>&1
+    echo "" >> ${outfile} 2>&1
+  done
 done
 
 for idx in \
@@ -34,19 +28,12 @@ for idx in \
   '20a' \
   '25a'
 do
-  echo "./cudaqap -s ./chr${idx}.dat"
-  echo "%> ./cudaqap -s ./chr${idx}.dat" >> ${outfile} 2>&1
-  ./cudaqap -s ./chr${idx}.dat >> ${outfile} 2>&1
-  echo "" >> ${outfile} 2>&1
-
-  echo "./cudaqap -s ./chr${idx}.dat"
-  echo "%> ./cudaqap -s ./chr${idx}.dat" >> ${outfile} 2>&1
-  ./cudaqap -s ./chr${idx}.dat >> ${outfile} 2>&1
-  echo "" >> ${outfile} 2>&1
-
-  echo "./cudaqap -s ./chr${idx}.dat"
-  echo "%> ./cudaqap -s ./chr${idx}.dat" >> ${outfile} 2>&1
-  ./cudaqap -s ./chr${idx}.dat >> ${outfile} 2>&1
-  echo "" >> ${outfile} 2>&1
+  for ((ctr=0; ctr<10; ctr++))
+  do
+    echo "./cudaqap -s ./chr${idx}.dat"
+    echo "%> ./cudaqap -s ./chr${idx}.dat" >> ${outfile} 2>&1
+    ./cudaqap -s ./chr${idx}.dat >> ${outfile} 2>&1
+    echo "" >> ${outfile} 2>&1
+  done
 done
 
