@@ -1,0 +1,14 @@
+CXX = /usr/bin/g++
+CPPFLAGS = -D_GNU_SOURCE -D_XOPEN_SOURCE=700
+CXXFLAGS = -g -O2 -std=c++17 -Wall -Wextra -Wpedantic
+
+PROGRAMS: test-next-permutation
+
+all: $(PROGRAMS)
+
+test-next-permutation: test-next-permutation.cpp
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@
+
+clean:
+	rm -f test-next-permutation
+
