@@ -42,6 +42,7 @@ __device__ uint64_t TOT = 0UL;
 __shared__ uint32_t MCDI;
 extern __shared__ uint32_t MCD[];
 __shared__ uint64_t __align__(8) XMC;
+__shared__ uint32_t __align__(8) STP;
 
 uint32_t* HGFLG;
 uint32_t* HGDST;
@@ -80,21 +81,22 @@ void swap(_Ty* A, _Ty* B) {
 }
 
 template<typename _Ty>
-__device__
+__device__ __forceinline__
 _Ty min(_Ty A, _Ty B) {
   return A < B ? A : B;
 }
 
 template<typename _Ty>
 __device__
-void reverse(_Ty* AX, int32_t B, int32_t E) {
+void reverse(_Ty* AX, int64_t B, int64_t E) {
   while (B < E) {
     swap(&AX[B], &AX[E]);
+    __threadfence();
     ++B;
     --E;
   }
 
-  __syncthreads();
+  __threadfence();
 }
 
 template<typename _Ty>
@@ -108,7 +110,7 @@ _Ty array_index(const _Ty* AX, uint32_t IXW, uint32_t IXH, uint32_t W) {
 template<typename _Ty>
 __device__
 bool next_permutation(_Ty* AX, uint32_t N) {
-  if (N < 2U)
+  if (N < 2U || STP)
     return false;
 
   int64_t K = static_cast<int64_t>(N - 2U);
@@ -117,8 +119,11 @@ bool next_permutation(_Ty* AX, uint32_t N) {
   while (K >= 0 && AX[K] >= AX[K + 1])
     --K;
 
-  if (K < 0)
+  if (K < 0) {
+    atomicAdd((unsigned int*) &STP, 1U);
+    __threadfence();
     return false;
+  }
 
   while (J >= 0 && AX[J] <= AX[K])
     --J;
@@ -453,17 +458,13 @@ bool Verify() {
 }
 
 __device__
-uint32_t ComputeCost(uint32_t WID) {
-  uint32_t DI;
-  uint32_t DJ;
+uint32_t ComputeCost(uint32_t WID, size_t LSS) {
   uint32_t Cost = 0U;
 
-  for (uint32_t I = 0; I < DSS; ++I) {
-    for (uint32_t J = 0; J < DSS; ++J) {
-      DI = GAS[I];
-      DJ = GAS[J];
-      Cost += qap::array_index(GFLG, I, J, WID) *
-              qap::array_index(GDST, DI, DJ, WID);
+  for (uint32_t I = 0; I < LSS; ++I) {
+    for (uint32_t J = 0; J < LSS; ++J) {
+      Cost += qap::array_index(GFLG, I, J, LSS) *
+              qap::array_index(GDST, GAS[I], GAS[J], LSS);
     }
   }
 
@@ -485,35 +486,39 @@ void PrintDeviceVector(const uint32_t* AS, uint32_t S, uint32_t TID) {
 }
 
 __global__ void QuadraticUniverse(size_t LSS, uint32_t* XAS) {
-  if (threadIdx.x == 0 && LSS > 2) {
+  if (LSS < 2)
+    return;
+
+  if (threadIdx.x == 0) {
     XMC = std::numeric_limits<uint64_t>::max();
+    STP = 0U;
+    __threadfence();
 
-    for (uint32_t I = 0; I < LSS; ++I) {
+    for (uint32_t I = 0; I < LSS; ++I)
       MCD[I] = XAS[I];
-    }
-  }
 
-  __syncthreads();
+    __threadfence();
+  }
 }
 
 template<uint32_t _ShmemSize = 4096, uint32_t _MCSize>
 __global__ void QuadraticAssignment(size_t LSS, uint32_t MCSize, uint32_t* XAS) {
-  if (LSS < 2)
+  if (LSS < 2 || STP)
     return;
 
-  (void) atomicAdd((unsigned long long*) &TOT, 1UL);
   uint32_t TID = blockIdx.x * blockDim.x + threadIdx.x;
 
+  (void) atomicAdd((unsigned long long*) &TOT, 1UL);
+
   do {
-    uint32_t CC = ComputeCost(W);
+    uint32_t CC = ComputeCost(W, LSS);
     (void) atomicMin((unsigned long long*) &XMC, CC);
     (void) atomicAdd((unsigned long long*) &IT, 1UL);
+    __threadfence();
   } while (qap::next_permutation(MCD, LSS));
 
-  __syncthreads();
-
   MC = XMC;
-  __syncthreads();
+  __threadfence();
 }
 
 uint64_t Iterations() {
