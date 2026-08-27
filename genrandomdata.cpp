@@ -3,60 +3,29 @@
 // Licensed under the MIT License.
 // See https://opensource.org/license/mit
 // SPDX-License-Identifier: MIT
-//
 
 #include <iostream>
 #include <vector>
 #include <set>
 #include <fstream>
 #include <cstdlib>
-#include <cstring>
 #include <cstdint>
-#include <cmath>
 #include <ctime>
 #include <getopt.h>
 
 static std::vector<std::set<uint32_t>> SV;
 static std::set<uint32_t> FUS;
 
-static inline int32_t GenSetElement(uint32_t ub) {
-  uint32_t e = 0;
-
-  do {
-    e = (int32_t) lrand48();
-  } while (e > ub || e < 1U);
-
-  return (int32_t) e;
+// lrand48() spans 0 .. 2^31-1. Scale that into the wanted range rather than
+// redrawing until it happens to land there: the old rejection loop accepted
+// with probability range/2^31, which is ~2^31 draws for a single fixed set
+// size and ~2^31/usize per element.
+static inline uint32_t GenSetElement(uint32_t ub) {
+  return 1U + (uint32_t) (lrand48() % (long) ub);
 }
 
-static inline uint32_t GenLowerBound(uint32_t ub) {
-  uint32_t lb = 0;
-
-  do {
-    lb = (int32_t) lrand48();
-  } while (lb > ub);
-
-  return lb;
-}
-
-static inline uint32_t GenUpperBound(uint32_t lim) {
-  uint32_t ub = 0;
-
-  do {
-    ub = (int32_t) lrand48();
-  } while (ub > lim);
-
-  return ub;
-}
-
-static inline uint32_t GenSetSize(uint32_t usize, uint32_t mSize, uint32_t MSize) {
-  uint32_t ssize = 0;
-
-  do {
-    ssize = (uint32_t) lrand48();
-  } while (ssize > MSize || ssize > usize || ssize < mSize);
-
-  return ssize;
+static inline uint32_t GenSetSize(uint32_t mSize, uint32_t MSize) {
+  return mSize + (uint32_t) (lrand48() % (long) (MSize - mSize + 1U));
 }
 
 bool WriteFile(const std::string& Filename) {
@@ -103,7 +72,7 @@ void PrintSet(const std::set<uint32_t>& S) {
   std::cerr << " }" << std::endl;
 }
 
-void PrintSetVector(const std::vector<std::set<uint32_t>> SV) {
+void PrintSetVector(const std::vector<std::set<uint32_t>>& SV) {
   if (!SV.empty()) {
     std::cerr << "======================================" << std::endl;
     std::vector<std::set<uint32_t>>::const_iterator I = SV.begin();
@@ -224,11 +193,28 @@ int main(int argc, char* const argv[])
   if (Fixed)
     MSize = mSize;
 
+  // Without these the generator hangs rather than complaining: a set size
+  // range that excludes every value never yields one, and a set wider than
+  // the universe can never be filled with distinct elements.
+  if (mSize == 0U || mSize > MSize) {
+    std::cerr << "Invalid subset size range " << mSize << ".." << MSize
+      << ": minsize must be non-zero and no greater than maxsize."
+      << std::endl;
+    return 1;
+  }
+
+  if (MSize > USize) {
+    std::cerr << "Subset size " << MSize << " exceeds the universe size "
+      << USize << ": a subset of distinct elements cannot be that large."
+      << std::endl;
+    return 1;
+  }
+
   srand48(time(0));
 
   if (Autofill) {
     while (FUS.size() < USize) {
-      uint32_t SSize = GenSetSize(USize, mSize, MSize);
+      uint32_t SSize = GenSetSize(mSize, MSize);
       std::set<uint32_t> TS;
 
       while (TS.size() < SSize) {
@@ -248,7 +234,7 @@ int main(int argc, char* const argv[])
 
     if (GSets < NSets) {
       for (uint32_t j = 0; j < NSets - GSets; ++j) {
-        uint32_t SSize = GenSetSize(USize, mSize, MSize);
+        uint32_t SSize = GenSetSize(mSize, MSize);
         std::set<uint32_t> TS;
 
         while (TS.size() < SSize) {
@@ -267,7 +253,7 @@ int main(int argc, char* const argv[])
     }
   } else {
     for (uint32_t j = 0; j < NSets; ++j) {
-      uint32_t SSize = GenSetSize(USize, mSize, MSize);
+      uint32_t SSize = GenSetSize(mSize, MSize);
       std::set<uint32_t> TS;
 
       while (TS.size() < SSize) {
@@ -288,7 +274,10 @@ int main(int argc, char* const argv[])
   if (!Quiet)
     PrintSetVector(SV);
 
-  if (!ValidateUniverseSets(USize)) {
+  // Full coverage is what --auto asks for, so only require it when it was
+  // requested. Previously every run was held to it, so a plain run that
+  // happened not to cover the universe threw away all of its output.
+  if (Autofill && !ValidateUniverseSets(USize)) {
     std::cerr << "Generated Universe Sets do not cover the entire Universe."
       << std::endl;
     return 1;

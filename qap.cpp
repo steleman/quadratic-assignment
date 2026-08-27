@@ -3,14 +3,11 @@
 // Licensed under the MIT License.
 // See https://opensource.org/license/mit
 // SPDX-License-Identifier: MIT
-//
 
 #include <iostream>
 #include <iomanip>
 #include <vector>
-#include <set>
 #include <fstream>
-#include <sstream>
 #include <algorithm>
 #include <limits>
 #include <cstdlib>
@@ -23,7 +20,10 @@
 static struct timespec tp_start;
 static struct timespec tp_end;
 
-static int Timestamp(struct timespec* ts) {
+// [[nodiscard]]: a failed timestamp leaves *ts untouched, which would make
+// PrintTimediff report a difference against uninitialized storage. Callers
+// must decide what to do rather than drop the status on the floor.
+[[nodiscard]] static int Timestamp(struct timespec* ts) {
   if (clock_gettime(CLOCK_REALTIME, ts) != 0) {
     std::cerr << "clock_gettime(2) failed: " << strerror(errno)
       << std::endl;
@@ -43,15 +43,31 @@ static void PrintTimediff(const struct timespec* S,
     return;
   }
 
-  int64_t Sec = ((int64_t) E->tv_sec - (int64_t) S->tv_sec) * 1000000000;
-  int64_t Nns = ((int64_t) E->tv_nsec - (int64_t) S->tv_nsec) / 1000000;
+  // Take the difference as one nanosecond count so that the nanosecond field
+  // borrows from the second field. Differencing the two fields separately and
+  // then taking labs() of the remainder loses the borrow entirely, and is only
+  // correct when the interval does not cross a second boundary.
+  int64_t Nns = ((int64_t) E->tv_sec - (int64_t) S->tv_sec) * 1000000000L +
+                ((int64_t) E->tv_nsec - (int64_t) S->tv_nsec);
+  const char* Sgn = "";
+
+  // Only reachable if the clock stepped backwards mid-run; show it rather
+  // than hiding it in an absolute value.
+  if (Nns < 0) {
+    Nns = -Nns;
+    Sgn = "-";
+  }
+
+  char Fill = std::cout.fill();
 
   std::cout << "Clock Resolution: " << (int64_t) R.tv_sec << '.'
     << std::setfill('0') << std::setw(9) << (int64_t) R.tv_nsec
     << '.' << std::endl;
-  std::cout << "CPU time: " << (int64_t) Sec / 1000000000L << '.'
-    << std::setfill('0') << std::setw(12) << (int64_t) Nns << " second(s)."
+  std::cout << "CPU time: " << Sgn << Nns / 1000000000L << '.'
+    << std::setfill('0') << std::setw(9) << Nns % 1000000000L << " second(s)."
     << std::endl;
+
+  std::cout.fill(Fill);
 }
 
 class QAP {
@@ -59,6 +75,7 @@ private:
   std::vector<std::vector<uint32_t>> FLG;
   std::vector<std::vector<uint32_t>> DST;
   std::vector<uint32_t> AS;
+  std::vector<uint32_t> BAS;
   uint64_t IT;
   uint32_t MC;
 
@@ -126,7 +143,8 @@ private:
   }
 
 public:
-  QAP() : FLG(), DST(), AS(), IT(0UL), MC(std::numeric_limits<uint32_t>::max())
+  QAP() : FLG(), DST(), AS(), BAS(), IT(0UL),
+          MC(std::numeric_limits<uint32_t>::max())
   { }
 
   void ReadFromFile(const std::string& FLGName,
@@ -169,7 +187,6 @@ public:
         }
       }
 
-      V.clear();
       C = 0U;
 
       while (std::getline(IFS, Line) && C++ <= N) {
@@ -216,17 +233,14 @@ public:
   uint32_t ComputeCost() const {
     uint32_t Cost = 0U;
 
-    for (uint32_t I = 0; I < AS.size(); ++I) {
-      for (uint32_t J = 0; J < AS.size(); ++J) {
+    for (uint32_t I = 0; I < AS.size(); ++I)
+      for (uint32_t J = 0; J < AS.size(); ++J)
         Cost += FLG[I][J] * DST[AS[I]][AS[J]];
-      }
-    }
 
     return Cost;
   }
 
   uint32_t QuadraticAssignment() {
-    AS.clear();
     AS.resize(FLG.size());
 
     for (uint32_t I = 0; I < FLG.size(); ++I)
@@ -234,11 +248,19 @@ public:
 
     MC = std::numeric_limits<uint32_t>::max();
 
+    BAS = AS;
+
     do {
       uint32_t Cost = ComputeCost();
+
+      // Keep the permutation, not just the cost: AS walks back round to
+      // sorted order when the enumeration completes, so it cannot be read
+      // back afterwards.
       if (Cost < MC) {
         MC = Cost;
+        BAS = AS;
       }
+
       ++IT;
     } while (std::next_permutation(AS.begin(), AS.end()));
 
@@ -258,7 +280,7 @@ public:
   }
 
   void PrintAssignmentVector() const {
-    PrintVector(AS);
+    PrintVector(BAS);
   }
 
   void Print() const {
@@ -334,7 +356,6 @@ int main(int argc, char* const argv[]) {
     case 'h':
       PrintHelp();
       return 0;
-      break;
     case 'p':
       Print = true;
       break;
@@ -350,7 +371,6 @@ int main(int argc, char* const argv[]) {
     default:
       PrintHelp();
       return 1;
-      break;
     }
   }
 
@@ -369,9 +389,10 @@ int main(int argc, char* const argv[]) {
   if (!Q.Verify())
     return 1;
 
-  Timestamp(&tp_start);
+  // Order matters: call Timestamp first so it is never short-circuited away.
+  bool Timed = Timestamp(&tp_start) == 0;
   uint32_t MC = Q.QuadraticAssignment();
-  Timestamp(&tp_end);
+  Timed = (Timestamp(&tp_end) == 0) && Timed;
 
   std::cout << "Minimum cost: " << MC << std::endl;
   std::cout << "Iterations: " << Q.Iterations() << std::endl;
@@ -379,7 +400,10 @@ int main(int argc, char* const argv[]) {
   if (Print)
     Q.Print();
 
-  PrintTimediff(&tp_start, &tp_end);
+  // A clock failure must not discard the result of the search itself;
+  // Timestamp has already said what went wrong on stderr.
+  if (Timed)
+    PrintTimediff(&tp_start, &tp_end);
 
   return 0;
 }

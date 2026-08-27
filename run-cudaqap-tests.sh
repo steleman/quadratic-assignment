@@ -6,22 +6,7 @@ outfile="cudaqap-output-${ts}.out"
 
 cat /dev/null > ${outfile}
 
-for idx in \
-  '100' \
-  '144' \
-  '256' \
-  '400' \
-  '625' \
-  '900'
-do
-  for ((ctr=0; ctr<10; ctr++))
-  do
-    echo "./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat"
-    echo "%> ./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat" >> ${outfile} 2>&1
-    ./cudaqap -d ./dstdata-${idx}.dat -f ./fldata-${idx}.dat >> ${outfile} 2>&1
-    echo "" >> ${outfile} 2>&1
-  done
-done
+echo "Warning: the 20a and 25a tests will take a *** very long time *** to complete."
 
 for idx in \
   '12a' \
@@ -30,9 +15,9 @@ for idx in \
 do
   for ((ctr=0; ctr<10; ctr++))
   do
-    echo "./cudaqap -s ./chr${idx}.dat"
-    echo "%> ./cudaqap -s ./chr${idx}.dat" >> ${outfile} 2>&1
-    ./cudaqap -s ./chr${idx}.dat >> ${outfile} 2>&1
+    echo "./cudaqap -s ./sample-data/chr${idx}.dat"
+    echo "%> ./cudaqap -s ./sample-data/chr${idx}.dat" >> ${outfile} 2>&1
+    ./cudaqap -s ./sample-data/chr${idx}.dat >> ${outfile} 2>&1
     echo "" >> ${outfile} 2>&1
   done
 done

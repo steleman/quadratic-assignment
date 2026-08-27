@@ -1,8 +1,33 @@
-CXX = /usr/bin/clang++
-CPPFLAGS = -D_GNU_SOURCE -D_XOPEN_SOURCE=700
+# Makefile.clang - macOS / clang build for the CPU programs.
+#
+# CUDA is not available on current macOS, so cudaqap is not built here. Use
+# Makefile.cuda on a machine with an NVIDIA GPU.
+#
+# Usage:
+#   make -f Makefile.clang            # genrandomdata + qap
+#   make -f Makefile.clang qap
+#   make -f Makefile.clang clean
+
+CXX = clang++
+
+# Darwin needs different feature macros from glibc, so this is not just the
+# Linux Makefile with the compiler swapped:
+#
+#   _GNU_SOURCE      is glibc-specific and does nothing here.
+#   _XOPEN_SOURCE    must NOT be defined. On Darwin it selects strict POSIX
+#                    and hides the BSD extensions these sources use - notably
+#                    getopt_long, which both programs need.
+#   _DARWIN_C_SOURCE keeps the full BSD/POSIX surface visible: strtok_r,
+#                    getopt_long, lrand48/srand48, clock_gettime/clock_getres.
+#
+# clock_getres(3) requires macOS 10.12 or later.
+CPPFLAGS = -D_DARWIN_C_SOURCE
 CXXFLAGS = -O3 -std=c++17 -Wall -Wextra -Wpedantic
 
-PROGRAMS: genrandomdata qap
+# Uncomment for a universal binary on Apple silicon plus Intel:
+# CXXFLAGS += -arch arm64 -arch x86_64
+
+PROGRAMS = genrandomdata qap
 
 all: $(PROGRAMS)
 
@@ -12,6 +37,7 @@ qap: qap.cpp
 genrandomdata: genrandomdata.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@
 
+.PHONY: all clean
+
 clean:
 	rm -f qap genrandomdata
-

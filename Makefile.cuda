@@ -1,5 +1,6 @@
 # Change this to match your installed CUDA version.
 CUDA_VERSION = 12.9
+# CUDA_VERSION = 13.2
 
 # Change this to match your CUDA installation.
 CUDA_ROOT = /usr/local/cuda-$(CUDA_VERSION)
@@ -8,6 +9,7 @@ CUDA_LIBDIR = $(CUDA_ROOT)/lib64
 
 # Change this to match your GPU's Compute Capabilities.
 CUDA_CC = 89
+# CUDA_CC = 120
 
 OFLAG = -O3
 CFLAG = -g
