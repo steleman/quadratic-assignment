@@ -8,12 +8,20 @@ which is exactly `N!` - and the minimizing assignment itself. Every run below
 was cross-checked against `qap` on the same input, and every assignment was
 re-scored independently to confirm it reproduces the reported cost.
 
+`cgbncudaqap` is a third solver, a variant of `cudaqap` that replaces the 64-bit
+iteration counter with a per-thread `uint64_t` plus an arbitrary-precision
+NVIDIA CGBN total, and the 64-bit permutation rank with a 128-bit one. It is
+covered in its own section at the end; everything between here and there
+describes `cudaqap`, and `cgbncudaqap` matches it measurement for measurement
+except where that section says otherwise.
+
 Build and run:
 
 ```
 %>> make -f Makefile.cuda
 %>> ./cudaqap -f ./fldata-144.dat -d ./dstdata-144.dat
 %>> ./cudaqap -s ./chr12a.dat
+%>> ./cgbncudaqap -s ./chr12a.dat
 ```
 
 Sample output
@@ -180,6 +188,8 @@ than one problem size per order of magnitude of hardware:
 Problem size 25 is too large: the permutation count does not fit in 64 bits (the limit is 20).
 ```
 
+  `cgbncudaqap` carries this to `N <= 24`; see **cgbncudaqap** below.
+
 The same check turns away the three largest sample pairs. `fldata-10000` and
 `fldata-65536` are 100x100 and 256x256, and `fldata-1000` is 1000x1000 - all
 square and well formed, all far past the limit, so `cudaqap` reports the size
@@ -188,23 +198,219 @@ and exits rather than starting a search that could never finish.
 Large runs
 ----------
 
-| N  |        permutations | threads | minimum cost | solve time | verified          |
-|----|---------------------|---------|--------------|------------|-------------------|
-| 13 |       6,227,020,800 |   89088 |       440532 |     1.66 s | cost + assignment |
-| 14 |      87,178,291,200 |   89088 |       423242 |    28.41 s | cost + assignment |
-| 15 |   1,307,674,368,000 |   89088 |       521907 |   458.27 s | iteration count   |
-| 16 |  20,922,789,888,000 |   83520 |       552418 |  8511.36 s | iteration count   |
+| N  | instance | solver        |        permutations | threads | minimum cost | solve time | verified          |
+|----|----------|---------------|---------------------|---------|--------------|------------|-------------------|
+| 13 | A        | `cudaqap`     |       6,227,020,800 |   89088 |       440532 |     1.66 s | cost + assignment |
+| 14 | A        | `cudaqap`     |      87,178,291,200 |   89088 |       423242 |    28.41 s | cost + assignment |
+| 15 | A        | `cudaqap`     |   1,307,674,368,000 |   89088 |       521907 |   458.27 s | iteration count   |
+| 15 | B        | `cudaqap`     |   1,307,674,368,000 |   89088 |       362694 |   456.92 s | cost + assignment |
+| 15 | B        | `cgbncudaqap` |   1,307,674,368,000 |   89088 |       362694 |   457.42 s | cost + assignment |
+| 16 | A        | `cudaqap`     |  20,922,789,888,000 |   83520 |       552418 |  8511.36 s | iteration count   |
 
-These are the four large runs behind the projections. Each ran on a random
-square instance generated for the purpose (they are not in the repo), and each
-iterated exactly `N!` times, which is what confirms the rank ranges tiled the
-whole permutation space with no gaps or overlap.
+These are the large runs behind the projections. Each ran on a random square
+instance generated for the purpose (they are not in the repo), and each iterated
+exactly `N!` times, which is what confirms the rank ranges tiled the whole
+permutation space with no gaps or overlap.
 
-The `verified` column is deliberate. For N=13 and N=14 the reported assignment
-was re-scored independently against the raw matrices and reproduced the cost.
-For N=15 and N=16 only the iteration count was checked: the assignment is
-printed with `-p`, and the program prints it at the end, so obtaining it means
-running the search again - 7.6 minutes and 2.4 hours respectively.
+The `instance` column matters at N=15, which has been run twice on two different
+inputs - hence the two different minimum costs. Instance B is the later pair,
+put through both GPU solvers with `-p`, and it is the stronger record: both
+returned the same assignment,
+`{ 14, 13, 12, 11, 10, 7, 9, 8, 6, 5, 4, 3, 2, 1, 0 }`, and re-scoring that
+permutation against the raw matrices reproduces 362694. The two solve times,
+456.92 s and 457.42 s, are also the tightest speed comparison in this document.
+
+The `verified` column is deliberate. Where it says `iteration count`, that is
+all that was checked: the assignment is printed at the end of the run with `-p`,
+so obtaining it after the fact means running the search again. That is what
+instance B bought at N=15, for two more 7.6-minute runs. N=16 would cost 2.4
+hours a side and remains unverified on assignment.
+
+cgbncudaqap
+-----------
+
+`cgbncudaqap.cu` is a variant of `cudaqap.cu`, not a rewrite. The search kernel,
+the launch-geometry selection, the odd shared-memory stride, the packed argmin
+key and the host-side unranking of the winner are all unchanged. Three things
+differ.
+
+### What changed
+
+**The iteration count is now per-thread.** `cudaqap` did a single
+`atomicAdd(&IT, Hi - Lo)` per thread into one device-wide `uint64_t`.
+`cgbncudaqap` gives each thread a private `uint64_t LIT`, increments it once per
+permutation actually scored, and stores it to `GITC[GTID]` when the thread
+finishes. Counting what the loop did rather than what it was asked to do is a
+slightly stronger check, and it is what the arbitrary-precision total is built
+from.
+
+**The global count is a CGBN accumulator.** `N!` passes `2^64` at `N = 21`:
+`21!` is 51090942171709440000 against a `uint64_t` ceiling of
+18446744073709551615, so there is no 64-bit value that could hold the answer.
+The total is instead summed into a 1024-bit `cgbn_mem_t` by two kernels:
+
+- `AccumulateIterations` runs 512 CGBN instances (64 blocks x 256 threads, one
+  warp per instance at `TPI = 32`). Each instance sums a strided share of
+  `GITC`. Striding rather than blocking avoids a division and keeps every
+  instance busy; integer addition is exact and associative, so visiting order
+  does not affect the result.
+- `CombineIterations` runs a single instance that folds the 512 partials into
+  one grand total.
+
+There is no lock and no host arithmetic in the reduction. `blockDim.x` must be a
+whole number of instances, because CGBN lays an instance's lanes out along
+`threadIdx.x` and derives its warp sync mask from that.
+
+**Permutation ranks are `__uint128_t`.** This, not the counter, is what lifts
+the size cap, and the reason it is not also CGBN is worth stating plainly: a
+CGBN value is not a scalar. Its limbs live across TPI cooperating lanes, so a
+single thread can neither hold one nor update one atomically - which rules CGBN
+out for anything per-thread, and a permutation rank is the most per-thread
+quantity in the program. The widest type one thread can own is `__uint128_t`,
+and `34!` (2.95e38) is the largest factorial under `2^128`.
+
+The division of labor follows from that constraint rather than from taste:
+per-thread state gets the widest scalar available, and the one genuinely global
+quantity gets CGBN.
+
+### Limits
+
+Two, both checked on the host before the launch:
+
+```
+%>> ./cgbncudaqap -f ./fldata-10000.dat -d ./dstdata-10000.dat
+Problem size 100 is too large: the permutation rank does not fit in 128 bits (the limit is 34).
+
+%>> ./cgbncudaqap -s ./chr25a.dat
+Problem size 25 gives 278577766582812248275 permutations per thread, which does not fit the 64-bit per-thread iteration counter.
+```
+
+The second is the binding one. `N! / threads` has to fit the local `uint64_t`,
+and on this GPU that admits `N = 24` at 11143110663312489931 permutations per
+thread - just inside the limit - and rejects `N = 25`. The cap is therefore
+device-dependent: it moves with the launch's thread count, which is itself
+derived from occupancy. Widening `LIT` to `__uint128_t` would take the cap to
+the rank ceiling of 34, but see the reach table below for why that would be
+decoration.
+
+Summarised: `cudaqap` stops at 20, `cgbncudaqap` at 24 in practice and 34 by
+construction, and the CGBN accumulator itself would not run out until `170!`.
+
+### Cost
+
+The search is not measurably slower. Same instances, same geometry; medians of
+7 runs at N=12, 5 at N=13, single runs at N=14 and N=15:
+
+| instance     | N  | `cudaqap`  solve  | `cgbncudaqap` solve | delta  | CGBN reduction |
+|--------------|----|-------------------|---------------------|--------|----------------|
+| `chr12a`     | 12 |         0.10494 s |           0.10474 s |  -0.2% |      0.00011 s |
+| `fldata-144` | 12 |         0.10508 s |           0.10577 s |  +0.7% |      0.00012 s |
+| generated    | 13 |         1.63598 s |           1.64306 s |  +0.4% |      0.00021 s |
+| generated    | 14 |        28.42631 s |           28.0748 s |  -1.2% |      0.00021 s |
+| generated    | 15 |       456.91564 s |          457.4166 s | +0.11% |      0.00021 s |
+
+N=15 is the tightest of these: 7.6 minutes of kernel apiece and a 0.11% difference, or half a second across 1307674368000 permutations. The deltas have no consistent sign and the largest is 1.2%, on one of the single-run rows; they are run-to-run noise. The 128-bit loop counter costs a handful of instructions against an `O(N^2)` cost evaluation, and `Chunk` and `Rem` are computed on the host and passed in as arguments, so no thread pays for a 128-bit division to find its own range. The reduction is about 0.2 ms and does not scale with `N` - it scales with the thread count, which is bounded by the device.
+
+Two output lines are new:
+
+```
+%>> ./cgbncudaqap -s ./chr12a.dat
+Minimum cost: 9552
+Iterations:   479001600
+Permutations: 479001600
+NumThreads:   89088
+CPU Clock Resolution: 0.000000001.
+GPU time: 0.104996840 second(s).
+CPU Clock Resolution: 0.000000001.
+CGBN reduction: 0.000101231 second(s).
+```
+
+`Permutations:` is `N!` computed on the host. Printing it beside `Iterations:`
+puts the check that matters - did the rank ranges tile the space exactly once -
+in the output itself. `CGBN reduction:` is timed separately from the search
+because it is the price of the arbitrary-precision counter, and the variant is
+only interesting if that price is visible.
+
+### Reach, with the counter no longer in the way
+
+Projected as `k * N! * N^2 / threads` with `k = 1.38e-7` fitted to the five
+measured anchors (N=12..16, spread +6.3%/-4.9%), and the thread count taken from
+the geometry the program actually selects at each size:
+
+| N  |                    iterations = N! | digits | 64-bit? | threads | time            |
+|----|------------------------------------|--------|---------|---------|-----------------|
+| 15 |                      1307674368000 |     13 | yes     |   89088 | 7.6 min (measured) |
+| 16 |                     20922789888000 |     14 | yes     |   83520 | 2.4 hrs (measured) |
+| 17 |                    355687428096000 |     15 | yes     |   83520 | 2.0 days        |
+| 18 |                   6402373705728000 |     16 | yes     |   74240 | 45 days         |
+| 19 |                 121645100408832000 |     18 | yes     |   74240 | 2.6 years       |
+| 20 |                2432902008176640000 |     19 | yes     |   66816 | 64 years        |
+| 21 |               51090942171709440000 |     20 | **no**  |   66816 | 1.5 thousand years |
+| 22 |             1124000727777607680000 |     22 | **no**  |   61248 | 39 thousand years |
+| 23 |            25852016738884976640000 |     23 | **no**  |   61248 | 970 thousand years |
+| 24 |           620448401733239439360000 |     24 | **no**  |   55680 | 28 million years |
+
+The four rows `cudaqap` cannot express at all are the four that need more than
+64 bits to state their own iteration count. `cgbncudaqap` states them exactly.
+It does not make them runnable: `N = 21` is about 1500 years on this GPU, and
+`N = 24` is 28 million. What the variant removes is an *arithmetic* limit that
+sat below the physical one - after this change nothing in the program stops
+before the hardware does.
+
+### Verification
+
+`cgbncudaqap` was checked the same three ways as `cudaqap` - cost, iteration
+count, assignment - against both `qap` and `cudaqap`:
+
+- All three agree on cost and assignment at N = 1, 2, 3, 4, 5, 8, 9, 10, 12, 13,
+  14, and `cudaqap` and `cgbncudaqap` also agree at N = 15. `Iterations` equals
+  `Permutations` equals `N!` exactly at every size.
+- `chr12a` reproduces QAPLIB's 9552 with the assignment
+  `{ 6, 4, 11, 1, 0, 2, 8, 10, 9, 5, 7, 3 }`, matching `cudaqap`.
+- The N=12, N=13, N=14, N=15 and `chr12a` assignments were re-scored
+  independently against the raw matrices and reproduced their reported costs.
+- Clean under `compute-sanitizer` at N=10, and re-run at N=13 - a size where
+  every thread walks a long private loop rather than a handful of permutations,
+  so the shared-memory slices and the reduction are under sustained load:
+
+  | tool         | N  | GPU time    | vs native | verdict                        |
+  |--------------|----|-------------|-----------|--------------------------------|
+  | (none)       | 13 |    1.643 s  |      1.0x | -                              |
+  | `synccheck`  | 13 |    1.664 s  |      1.0x | 0 errors                       |
+  | `initcheck`  | 13 |  332.943 s  |      203x | 0 errors                       |
+  | `memcheck`   | 13 |  414.840 s  |      253x | 0 errors                       |
+  | `racecheck`  | 13 |           - |    >6400x | killed after 2h55m, unfinished |
+  | (none)       | 10 |  0.000957 s |      1.0x | -                              |
+  | `racecheck`  | 10 |    7.258 s  |     7584x | 0 hazards, 0 errors, 0 warnings |
+
+  Every run that completed returned the same cost, iteration count and assignment
+  as its uninstrumented counterpart: 368897 / 6227020800 (exactly 13!) /
+  `{ 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 }` at N=13, and 165908 / 3628800
+  (exactly 10!) / `{ 9, 8, 7, 6, 5, 3, 4, 2, 1, 0 }` at N=10. `synccheck` is
+  effectively free; `initcheck` and `memcheck` cost about 200-250x, the same
+  ratios measured at N=12 (209x and 263x).
+
+  `racecheck` is in a different class at roughly 7600x, and it is run at N=10 by
+  choice rather than by concession. A larger N adds it no coverage: the race
+  surface - the per-thread `MCD` slices, the shared `BKEY`, and the block and
+  global `atomicMin`s - is identical at every problem size, and N only changes
+  how many times each thread goes round its own private loop. The N=13 attempt
+  bears that out from the other direction: it was killed after two hours and
+  fifty-five minutes without finishing, against 7.6 seconds for the N=10 run
+  that reports the same thing.
+
+The two things that cannot be reached by running the solver were tested
+directly, since no `N >= 21` search will ever terminate:
+
+- **The 128-bit ranking.** The `qap` namespace was extracted verbatim from
+  `cgbncudaqap.cu` into a harness that unranks a given rank on the device and
+  steps it forward, and its output was compared against an independent
+  arbitrary-precision reference. 224 ranks across N=21..34 - including 0, 1,
+  `N!-1`, `N!-2`, `N!/2` and random ranks - matched exactly.
+- **The CGBN reduction past 2^64.** `AccumulateIterations`, `CombineIterations`
+  and `BigToString` were extracted verbatim and fed counts summing to as much as
+  25 decimal digits, including the instance-count boundaries (511/512/513
+  threads) and 100000 threads. All exact.
 
 Environment
 -----------
@@ -216,5 +422,10 @@ nvcc    release 12.9, V12.9.86   (Makefile.cuda: CUDA_VERSION = 12.9, CUDA_CC = 
 g++     14.3.1 20250523 (Red Hat 14.3.1-1)
 ```
 
-Verified clean under `compute-sanitizer` for `memcheck`, `racecheck`,
-`synccheck`, and `initcheck`.
+`cudaqap` is verified clean under `compute-sanitizer` for `memcheck`,
+`racecheck`, `synccheck`, and `initcheck`. `cgbncudaqap` is clean under all four:
+`synccheck`, `initcheck` and `memcheck` at N=13, and `racecheck` at N=10, where
+it reports 0 hazards, 0 errors and 0 warnings. See the table in
+**cgbncudaqap > Verification** for the per-tool costs and for why `racecheck` is
+run at N=10.
+

@@ -1,5 +1,6 @@
 # Change this to match your installed CUDA version.
 CUDA_VERSION = 12.9
+# Change to this for Blackwell:
 # CUDA_VERSION = 13.2
 
 # Change this to match your CUDA installation.
@@ -9,7 +10,12 @@ CUDA_LIBDIR = $(CUDA_ROOT)/lib64
 
 # Change this to match your GPU's Compute Capabilities.
 CUDA_CC = 89
+# Change to this for Blackwell:
 # CUDA_CC = 120
+
+# NVIDIA CGBN. Header-only; this is the directory *containing* the cgbn/
+# directory, so that #include <cgbn/cgbn.h> resolves. Only cgbncudaqap needs it.
+CGBN_INCDIR = /usr/local/include
 
 OFLAG = -O3
 CFLAG = -g
@@ -23,8 +29,14 @@ NVCC_CXXFLAGS += --generate-code=arch=compute_$(CUDA_CC),code=\[compute_$(CUDA_C
 NVCC_CXXFLAGS += -objtemp
 NVCC_CPPFLAGS = -D_GNU_SOURCE -D_XOPEN_SOURCE=700
 
+CGBN_CPPFLAGS = -I$(CGBN_INCDIR)
+
 CUDA_LIBRARIES = /usr/lib64/libcuda.so $(CUDA_LIBDIR)/libcudart.so
 CUDA_LIBRARIES += $(CUDA_LIBDIR)/libcudadevrt.a
+
+# CGBN's host pass selects its backend from <gmp.h>, so cgbncudaqap links GMP.
+# It is also what formats the arbitrary-precision iteration count in decimal.
+GMP_LIBRARIES = -lgmp
 
 CXX = /usr/bin/g++
 CXXFLAGS = $(GFLAG) $(OFLAG) -std=c++17
@@ -32,7 +44,7 @@ CPPFLAGS = $(NVCC_CPPFLAGS)
 
 LDFLAGS = $(OFLAG) $(CUDA_LIBRARIES) -Wl,-rpath -Wl,$(CUDA_LIBDIR)
 
-PROGRAMS = cudaqap
+PROGRAMS = cudaqap cgbncudaqap
 
 all: $(PROGRAMS)
 
@@ -42,6 +54,13 @@ cudaqap.o: cudaqap.cu
 cudaqap: cudaqap.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< -o $@
 
-clean:
-	rm -f cudaqap.o cudaqap
+cgbncudaqap.o: cgbncudaqap.cu
+	$(NVCC) $(NVCC_CPPFLAGS) $(CGBN_CPPFLAGS) $(NVCC_CXXFLAGS) $< -o $@
 
+cgbncudaqap: cgbncudaqap.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(GMP_LIBRARIES) -o $@
+
+.PHONY: all clean
+
+clean:
+	rm -f cudaqap.o cudaqap cgbncudaqap.o cgbncudaqap
