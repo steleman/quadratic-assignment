@@ -14,7 +14,8 @@ CUDA_CC = 89
 # CUDA_CC = 120
 
 # NVIDIA CGBN. Header-only; this is the directory *containing* the cgbn/
-# directory, so that #include <cgbn/cgbn.h> resolves. Only cgbncudaqap needs it.
+# directory, so that #include <cgbn/cgbn.h> resolves. Only cgbncudaqap and
+# cgbncudaqapbb need it.
 CGBN_INCDIR = /usr/local/include
 
 OFLAG = -O3
@@ -34,8 +35,9 @@ CGBN_CPPFLAGS = -I$(CGBN_INCDIR)
 CUDA_LIBRARIES = /usr/lib64/libcuda.so $(CUDA_LIBDIR)/libcudart.so
 CUDA_LIBRARIES += $(CUDA_LIBDIR)/libcudadevrt.a
 
-# CGBN's host pass selects its backend from <gmp.h>, so cgbncudaqap links GMP.
-# It is also what formats the arbitrary-precision iteration count in decimal.
+# CGBN's host pass selects its backend from <gmp.h>, so the two CGBN programs
+# link GMP. It is also what formats the arbitrary-precision counters in
+# decimal, and what builds cgbncudaqapbb's table of factorials.
 GMP_LIBRARIES = -lgmp
 
 CXX = /usr/bin/g++
@@ -44,7 +46,7 @@ CPPFLAGS = $(NVCC_CPPFLAGS)
 
 LDFLAGS = $(OFLAG) $(CUDA_LIBRARIES) -Wl,-rpath -Wl,$(CUDA_LIBDIR)
 
-PROGRAMS = cudaqap cgbncudaqap
+PROGRAMS = cudaqap cgbncudaqap cgbncudaqapbb
 
 all: $(PROGRAMS)
 
@@ -60,7 +62,14 @@ cgbncudaqap.o: cgbncudaqap.cu
 cgbncudaqap: cgbncudaqap.o
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(GMP_LIBRARIES) -o $@
 
+cgbncudaqapbb.o: cgbncudaqapbb.cu
+	$(NVCC) $(NVCC_CPPFLAGS) $(CGBN_CPPFLAGS) $(NVCC_CXXFLAGS) $< -o $@
+
+cgbncudaqapbb: cgbncudaqapbb.o
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(GMP_LIBRARIES) -o $@
+
 .PHONY: all clean
 
 clean:
-	rm -f cudaqap.o cudaqap cgbncudaqap.o cgbncudaqap
+	rm -f cudaqap.o cudaqap cgbncudaqap.o cgbncudaqap \
+	      cgbncudaqapbb.o cgbncudaqapbb
