@@ -11,9 +11,14 @@ re-scored independently to confirm it reproduces the reported cost.
 `cgbncudaqap` is a third solver, a variant of `cudaqap` that replaces the 64-bit
 iteration counter with a per-thread `uint64_t` plus an arbitrary-precision
 NVIDIA CGBN total, and the 64-bit permutation rank with a 128-bit one. It is
-covered in its own section at the end; everything between here and there
-describes `cudaqap`, and `cgbncudaqap` matches it measurement for measurement
-except where that section says otherwise.
+covered in its own section; everything between here and there describes
+`cudaqap`, and `cgbncudaqap` matches it measurement for measurement except
+where that section says otherwise.
+
+`cgbncudaqapbb` is a fourth solver and the only one that does not enumerate.
+It searches the same space with the Gilmore-Lawler branch and bound of
+`qapbb.c`, so `N!` is no longer its runtime and no longer its correctness
+check; both are replaced, and the last section covers what by.
 
 Build and run:
 
@@ -22,6 +27,8 @@ Build and run:
 %>> ./cudaqap -f ./fldata-144.dat -d ./dstdata-144.dat
 %>> ./cudaqap -s ./chr12a.dat
 %>> ./cgbncudaqap -s ./chr12a.dat
+%>> ./cgbncudaqapbb -s ./chr25a.dat
+%>> cc -O2 -fwrapv -o qapbb qapbb.c && ./qapbb < ./chr25a.dat
 ```
 
 Sample output
@@ -269,7 +276,7 @@ out for anything per-thread, and a permutation rank is the most per-thread
 quantity in the program. The widest type one thread can own is `__uint128_t`,
 and `34!` (2.95e38) is the largest factorial under `2^128`.
 
-The division of labor follows from that constraint rather than from taste:
+The division of labour follows from that constraint rather than from taste:
 per-thread state gets the widest scalar available, and the one genuinely global
 quantity gets CGBN.
 
@@ -301,15 +308,23 @@ construction, and the CGBN accumulator itself would not run out until `170!`.
 The search is not measurably slower. Same instances, same geometry; medians of
 7 runs at N=12, 5 at N=13, single runs at N=14 and N=15:
 
-| instance     | N  | `cudaqap`  solve  | `cgbncudaqap` solve | delta  | CGBN reduction |
-|--------------|----|-------------------|---------------------|--------|----------------|
-| `chr12a`     | 12 |         0.10494 s |           0.10474 s |  -0.2% |      0.00011 s |
-| `fldata-144` | 12 |         0.10508 s |           0.10577 s |  +0.7% |      0.00012 s |
-| generated    | 13 |         1.63598 s |           1.64306 s |  +0.4% |      0.00021 s |
-| generated    | 14 |        28.42631 s |           28.0748 s |  -1.2% |      0.00021 s |
-| generated    | 15 |       456.91564 s |          457.4166 s | +0.11% |      0.00021 s |
+| instance     | N  | `cudaqap` solve | `cgbncudaqap` solve | delta  | CGBN reduction |
+|--------------|----|-----------------|---------------------|--------|----------------|
+| `chr12a`     | 12 |       0.10494 s |           0.10474 s |  -0.2% |      0.00011 s |
+| `fldata-144` | 12 |       0.10508 s |           0.10577 s |  +0.7% |      0.00012 s |
+| generated    | 13 |        1.63598 s |            1.64306 s |  +0.4% |      0.00021 s |
+| generated    | 14 |       28.4263 s |           28.0748 s |  -1.2% |      0.00021 s |
+| generated    | 15 |      456.9156 s |          457.4166 s | +0.11% |      0.00021 s |
 
-N=15 is the tightest of these: 7.6 minutes of kernel apiece and a 0.11% difference, or half a second across 1307674368000 permutations. The deltas have no consistent sign and the largest is 1.2%, on one of the single-run rows; they are run-to-run noise. The 128-bit loop counter costs a handful of instructions against an `O(N^2)` cost evaluation, and `Chunk` and `Rem` are computed on the host and passed in as arguments, so no thread pays for a 128-bit division to find its own range. The reduction is about 0.2 ms and does not scale with `N` - it scales with the thread count, which is bounded by the device.
+N=15 is the tightest of these: 7.6 minutes of kernel apiece and a 0.11%
+difference, or half a second across 1307674368000 permutations. The deltas have
+no consistent sign and the largest is 1.2%, on one of the single-run rows; they
+are run-to-run noise. The 128-bit loop counter costs a handful of instructions
+against an `O(N^2)` cost evaluation, and
+`Chunk` and `Rem` are computed on the host and passed in as arguments, so no
+thread pays for a 128-bit division to find its own range. The reduction is about
+0.2 ms and does not scale with `N` - it scales with the thread count, which is
+bounded by the device.
 
 Two output lines are new:
 
@@ -412,6 +427,303 @@ directly, since no `N >= 21` search will ever terminate:
   25 decimal digits, including the instance-count boundaries (511/512/513
   threads) and 100000 threads. All exact.
 
+cgbncudaqapbb
+-------------
+
+`cgbncudaqapbb.cu` keeps `cgbncudaqap.cu`'s scaffolding - option parsing, the
+input readers, `Verify()`, the launch-geometry search, the packed argmin key,
+128-bit ranks, the CGBN reduction kernels, `BigToString` - and replaces the
+search. The bound is `qapbb.c`'s, ported function for function into
+`namespace qapbb` with the FORTRAN label numbers and 1-based arrays intact.
+
+### The tree had to change
+
+`qapbb` branches on the single assignment `(i,j)` with maximal alternative
+cost: one child assigns it, the other forbids it. That is a strong rule on one
+core and unusable on a GPU, because a node's identity is then a set of
+forbidden cells. There is no cheap index for it, so there is no cheap way to
+say "thread 8000 takes that subtree".
+
+`cgbncudaqapbb` places the facilities in a fixed order instead - one per level,
+in an order chosen at the root by decreasing total flow - so a node at level
+`L` *is* an injective `L`-tuple of locations, with an ordinary mixed-radix
+rank. A thread can be handed one 128-bit number and rebuild the node from it.
+`ALTKOS` and the `ZUL`/`IKAP` bookkeeping that served the old rule are gone,
+and `PROGNO`'s `CSPEI` cache went with them: the n-ary tree never revisits a
+level's matrix, so the cache had nothing to give back. That also removed
+`N(N+1)(2N+1)/6` words per thread, 11 KB at `N = 20`.
+
+The root relabelling is not cosmetic. Index order is branching order, so
+placing the most heavily connected facility first tightens the bound early.
+Measured on a single-threaded host build of this same search, where the node
+count is not perturbed by the incumbent race: `chr20a` fell from 32462 nodes
+to 11859 and `chr25a` from 17.8 million to 827 thousand when it was added.
+
+### Growing the frontier instead of splitting the tree
+
+The first working version cut the tree at a fixed depth, indexed the nodes at
+that depth, and let threads claim ranges of them from a work queue. It was
+correct and it was slower than one CPU core. The reason is in its own output:
+
+```
+N = 25, fixed depth-5 split
+B&B nodes:    8675014
+Busiest:      257352 node(s)
+GPU time:     61.960711364 second(s).
+```
+
+8.68 million nodes across the whole launch, and one thread held 257352 of
+them. Every other thread finished in the first second. Under a pruning bound
+the subtree sizes span five orders of magnitude, and no fixed depth fixes that: a
+finer cut makes the queue longer without making the largest piece smaller,
+because the piece that matters is deep inside one branch.
+
+So the frontier is grown rather than guessed. `ExpandFrontier` takes the live
+nodes at level `L`, rebuilds each one's state from its rank, bounds all of its
+children in parallel, accounts for the dead ones and appends the survivors to
+the next level's buffer. The host repeats that until the frontier holds `32`
+live nodes per thread, or until the next level would not fit, or until the
+128-bit rank would overflow. `BranchAndBound` then hands the frontier out one
+subtree per task. Small instances never leave the breadth-first phase at all -
+the `Frontier:` line says `- solved breadth-first` when the whole search
+finished there.
+
+Same instance, same machine, after:
+
+```
+B&B nodes:    8596072
+Busiest:      795 node(s), 0 idle thread(s)
+GPU time:     2.735117544 second(s).
+```
+
+Rebuilding a node's state from its rank costs `O(L*N^2)` against a node's own
+`O(N^3)`, which is what buys the expansion its freedom: no frontier node
+depends on any other, so there is no synchronisation inside a level.
+
+### The free incumbent
+
+The LSAP that produces a node's bound also produces a complete, feasible
+assignment of every facility still free to a location still free. Scoring it
+costs `O(m^2)` against the bound's `O(m^3)` and needs nothing the workspace
+does not already hold, so `TryCompletion` scores it and offers it to the
+incumbent.
+
+This matters more on a GPU than it would on a CPU. A sequential search reaches
+a leaf almost immediately and prunes with a real solution from then on. Tens of
+thousands of threads starting at once have nothing but the host's 2-opt bound
+until one of them gets to the bottom, and everything they do in the meantime is
+speculative. On `chr25a`, where the host heuristic comes in at 5062 against an
+optimum of 3796, adding it took the node count from 19.7 million to 6.0
+million.
+
+That figure is for running it on every live node. The shipped version runs it
+on every eighth: unthrottled it cost 28% on `fldata-400`, whose starting
+heuristic was already optimal and had nothing to gain. Sampled, `chr25a`
+settles at about 7.9 million - most of the benefit for a few percent, because
+with fifteen thousand threads the incumbent still improves in bursts.
+
+### N! is still the check, differently
+
+There is no `Iterations: == N!` line any more, because a pruning search does
+not visit `N!` of anything. The replacement is exact and stronger, in that it
+constrains the pruning as well as the enumeration.
+
+Every node the search disposes of - pruned by the bound, or evaluated as the
+closed-form pair of last-two-facility completions - stands for exactly `(N-L)!`
+complete permutations, where `L` is its level. A node that is *not* disposed of
+passes its `(N-L)!` down to its `N-L` children, each worth `(N-L-1)!`, which
+sum to the same thing. So the disposal counts, weighted by factorials, must
+come to precisely `N!`.
+
+Each thread keeps one `uint64_t` count per level. `SumCounters` folds those
+into one count per level, and `CombinePermutations` - a single CGBN instance -
+forms `sum count_L * (N-L)!` in 1024-bit arithmetic and subtracts it from `N!`:
+
+```
+Permutations: 265252859812191058636308480000000
+Accounted:    265252859812191058636308480000000
+Residual:     0
+```
+
+The counts stay 64-bit and only the products are wide, which is what makes the
+per-thread side of it free. `cgbn_mul` returns the low half of the product,
+which is the whole product here: a count below `2^64` times a factorial below
+`2^1024` could only need more than 1024 bits at sizes whose workspace could
+never be allocated.
+
+The residual is formed as a **signed** value, using `cgbn_signed_is_negative`
+and `cgbn_signed_abs` from this CGBN fork's `cgbn_signed.h`. Unsigned, a search
+that covered something twice would wrap `N! - accounted` into an enormous
+positive number and read as a wildly wrong under-count; signed, the sign says
+which way the error went. This is not hypothetical - see below.
+
+### What the residual did and did not catch
+
+Two real bugs got through it during development, and between them they are the
+argument for reading all three of the cost, the residual and the node count.
+
+**The 128-bit rank.** The frontier initially held 64-bit ranks. A rank at level
+`L` runs to `N!/(N-L)!`, which at `N = 25` passes `2^64` at depth 16; a wrapped
+rank decodes to a different node, so the search covered some subtrees twice and
+missed others. It returned 3856 for `chr25a` instead of 3796 - and it reported
+`Residual: 0` while doing it, because the accounting faithfully counts what the
+search disposed of, not what it should have. What caught this was the QAPLIB
+optimum, not the residual. The frontier now holds `__uint128_t`, and the host
+stops deepening one level before `N!/(N-L)!` would leave 128 bits.
+
+**The missing root tables.** Both kernels must call `wegspe` once at the root
+to build the level-0 sorted rows that the Gilmore-Lawler scalar products are
+read from. An early version of the rewrite dropped that call. The bound then
+fell back to its linear part - still a valid lower bound, so still the right
+answer, and still `Residual: 0` - and simply stopped pruning: `fldata-400` went
+from 101 thousand nodes to 88 million. Nothing but the node count showed it.
+
+The lesson both times is that the reported cost and the residual are necessary
+and not sufficient. The node count is the third instrument, and it is why it is
+printed.
+
+### Measurements
+
+Against `qapbb` on the same machine. `qapbb` times are whole-run; the GPU
+column is solve time as reported. Medians of 5 for the fast instances.
+
+| instance             | N  | minimum cost | GPU nodes  | `qapbb` | `cgbncudaqapbb` | speedup |
+|----------------------|----|--------------|------------|---------|-----------------|---------|
+| `chr12a`             | 12 |         9552 |       1479 | 0.0016s |         0.0267s |   0.06x |
+| `fldata-144` pair    | 12 |       953450 |       3567 | 0.0016s |         0.0319s |   0.05x |
+| `fldata-225` pair    | 15 |      2135449 |        902 | 0.0028s |         0.0622s |   0.05x |
+| `fldata-256` pair    | 16 |      2942118 |      17162 | 0.0292s |         0.1068s |   0.27x |
+| `chr20a`             | 20 |         2192 |     158236 | 0.0548s |         0.1677s |   0.33x |
+| `fldata-400` pair    | 20 |      9779382 |     100978 | 0.164s  |         0.2887s |   0.57x |
+| `chr25a`             | 25 |         3796 |     ~7.9e6 | 11.2s   |         2.46s   |    4.6x |
+| `fldata-625` pair    | 25 |     41048904 |    8596072 | 71.8s   |         2.74s   |     26x |
+| `fldata-900` pair    | 30 |    119265331 |   33496281 | 2248s   |        19.99s   |    112x |
+| `fldata-1024` pair   | 32 |    189919789 | 1484193064 | -       |      1275.31s   |       - |
+
+The crossover is around `N = 20`. Below it the tree is too small to spread over
+15000 threads and the GPU is paying setup costs against a search one core
+finishes in milliseconds; above it the node count grows, and the node count is
+the thing that parallelises. `qapbb` at `N = 30` took 2248 seconds - thirty-seven
+minutes - and returned an assignment that re-scores to 119265331, the same
+optimum the GPU reached in twenty seconds. It was started on `N = 32` as well
+and stopped, unfinished, after two hours - as was a single-threaded host build
+of the GPU's own algorithm, at one hour forty against the GPU's twenty-one
+minutes. That is why the `N = 32` row has no CPU figure: `N = 30` is the last
+size where both were run to completion, and `N = 32` rests on the program's own
+checks instead.
+
+`N = 32` is worth its own look, because it is the only instance measured here
+that uses the whole design. Every smaller one is finished by the breadth-first
+phase before the frontier reaches its target; this one stops the expansion at
+depth 7 with 665914 live nodes and hands them to the depth-first phase:
+
+```
+Minimum cost: 189919789
+B&B nodes:    1484193064
+Permutations: 263130836933693530167218012160000000
+Accounted:    263130836933693530167218012160000000
+Residual:     0
+Start bound:  189919789
+NumThreads:   14848
+Frontier:     665914 live node(s) at depth 7 into the depth-first phase
+Busiest:      2366935 node(s), 0 idle thread(s)
+GPU time: 1275.305643775 second(s).
+```
+
+Three things in that output are the design working. 1.48 billion nodes in 21
+minutes is 1.16 million bounds a second, each one an LSAP. `Busiest:` is
+2366935 against 1484193064, so the thread that drew the largest of the 665914
+subtrees carried 0.16% of the search - the tail that made the first version of
+this program useless is gone. And 32! is
+263130836933693530167218012160000000, an exact 118-bit answer arrived at by
+summing 64-bit counts: fifty-four bits more than any counter a thread could
+have carried. It is still inside 128 bits - 34! is where that runs out - so
+this size does not yet need the full 1024, but it is well past the point where
+`cudaqap`'s and `cgbncudaqap`'s `Iterations:` line could have been written down
+at all.
+
+The two do not explore the same tree, which the table cannot show. A cleaner
+parallel-speedup figure comes from a host build of `cgbncudaqapbb`'s own
+algorithm, single-threaded: `fldata-625` 54.0 s against 2.74 s, and
+`fldata-900` 420.7 s against 19.99 s - 20x and 21x, on the same tree, the same
+bound and very nearly the same node counts (8596072 against 8596159 at N=25;
+33496281 against 33496339 at N=30).
+
+`NumThreads` is 14848 at every size measured, which is what the occupancy API
+gives for this kernel - register pressure, not shared memory, since there is
+none. The second cap, three fifths of free device memory divided by the
+per-thread workspace, does not bind below about `N = 50`: the sorted-row
+tables are `O(N^3)` words, 48 KB per thread at `N = 25` but 618 KB at
+`N = 60`. `-t` lowers the count by hand; it is worth reaching for only to
+reproduce a measurement, since fewer threads is strictly less parallelism.
+
+### Determinism
+
+The optimum, `Accounted:` and `Residual:` are reproducible. The node count is
+not, and cannot be: every thread prunes against one shared incumbent, so how
+much speculative work gets done before someone lowers it depends on timing.
+`chr25a` measured 7915417, 7939937 and 10001210 nodes on three consecutive
+runs, all returning 3796 with a residual of zero. Instances whose starting
+heuristic is already optimal are reproducible, because the incumbent then never
+moves: `fldata-625` gave 8596072 nodes on all three runs.
+
+Ties may also resolve differently from the three brute-force solvers. Pruning
+is `bound >= incumbent`, so a second permutation of equal cost is discarded
+rather than compared, and there is no equivalent of "lexicographically first
+among ties". In practice the assignment matched `qap` exactly on all eight
+small pair-format inputs tested, but that is a property of those inputs.
+
+### Verification
+
+Costs match `qapbb` on every instance tested and QAPLIB on all three `chr`
+instances (9552 / 2192 / 3796). Assignments match `qap` on `fldata-9`, `-16`,
+`-25`, `-64`, `-81`, `-100`, `-144` and `-12a`. `Residual:` is 0 everywhere.
+The program re-scores its own reported assignment against the untouched input
+matrices and complains on stderr if that disagrees with the search's figure,
+since the search works in reduced arithmetic; it never has.
+
+A correct run always has a residual of zero, so the signed arithmetic is a path
+the solver cannot reach. It was validated by extraction, as `cgbncudaqap`'s
+`N >= 21` paths were: `CombinePermutations`, `CgbnSetUi64` and `BigToString`
+were pulled verbatim into a scratch harness and driven with hand-built level
+counts at `N = 25`.
+
+| level counts                        | accounted                  | residual                  |
+|-------------------------------------|----------------------------|---------------------------|
+| 25 nodes at level 1 (exact)          | 15511210043330985984000000 | 0                         |
+| one level-1 node lost                | 14890761641597746544640000 | 620448401733239439360000  |
+| one extra level-2 node               | 15537062060069870960640000 | -25852016738884976640000  |
+| one extra level-1 node               | 16131658445064225423360000 | -620448401733239439360000 |
+
+The exact case is `25 * 24! == 25!`. The three errors come back as `+24!`,
+`-23!` and `-24!` respectively - the right magnitude and, for the two
+over-counts, the right sign. Repeat this if the accounting or the reduction is
+touched.
+
+`compute-sanitizer` is far cheaper here than on `cgbncudaqap`, and cheap enough
+that all four tools can be run on the same instance without planning around
+them:
+
+| tool         | N  | GPU time   | vs native | verdict                          |
+|--------------|----|------------|-----------|----------------------------------|
+| (none)       | 12 |   0.0316 s |      1.0x | -                                |
+| `synccheck`  | 12 |   0.0333 s |      1.1x | 0 errors                         |
+| `initcheck`  | 12 |   0.4367 s |       14x | 0 errors                         |
+| `memcheck`   | 12 |   0.6704 s |       21x | 0 errors                         |
+| (none)       | 10 |   0.0145 s |      1.0x | -                                |
+| `racecheck`  | 10 |   0.2322 s |       16x | 0 hazards, 0 errors, 0 warnings  |
+
+All four returned the same cost, node count and residual as the uninstrumented
+run: 953450 in 3567 nodes at `N = 12`, 165908 in 104 nodes at `N = 10`, residual
+zero throughout. The costs are worth comparing against `cgbncudaqap`, where
+`initcheck` runs 203x and `memcheck` 253x: those instrument every global access,
+and the enumerating kernel makes `O(N^2)` of them per permutation over `N!`
+permutations. `racecheck` is the sharper contrast - 16x here against roughly
+7600x there - and that one is the shared memory. `cgbncudaqap` gives every
+thread an `MCD` slice to instrument; this kernel has no shared memory at all,
+so all `racecheck` has to watch is the argmin `atomicMin` and the frontier's
+append counter.
+
 Environment
 -----------
 
@@ -427,5 +739,5 @@ g++     14.3.1 20250523 (Red Hat 14.3.1-1)
 `synccheck`, `initcheck` and `memcheck` at N=13, and `racecheck` at N=10, where
 it reports 0 hazards, 0 errors and 0 warnings. See the table in
 **cgbncudaqap > Verification** for the per-tool costs and for why `racecheck` is
-run at N=10.
-
+run at N=10. `cgbncudaqapbb` is clean under all four as well, at a small
+fraction of the cost; see **cgbncudaqapbb > Verification**.

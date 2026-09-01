@@ -13,7 +13,7 @@ This repo contains an implementation of a serial (brute-force) approach to the Q
 
 The three brute-force solvers enumerate *every* permutation of the assignment vector and keep the minimum of `sum_ij FLG[i][j] * DST[AS[i]][AS[j]]`. They must agree on three things: the minimum cost, the iteration count - which is exactly `N!` for an `N x N` instance - and the minimizing assignment itself.
 
-The two branch-and-bound solvers return the same minimum cost without visiting anything like `N!` nodes, which is what puts `N = 25` and `N = 30` in reach at all. See **Performance** below for the comparisons, and `cudaqap.md` for the full measurements.
+The two branch-and-bound solvers return the same minimum cost without visiting anything like `N!` nodes, which is what puts `N = 25` and `N = 30` in reach at all. See **Performance** below for the comparisons, and [`cudaqap.md`](https://github.com/steleman/quadratic-assignment/blob/main/cudaqap.md) for the full measurements.
 
 Building
 --------
